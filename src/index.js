@@ -5,21 +5,20 @@ const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
 
 const replaceCodeTab = (str = '') => {
-    return str.replace(/<code>(.+)<\/code>/g, (match, p1) => {
-        return '`' + p1 + '`'
-    })
+    return str.replace(/\<code\>/g, '`')
+        .replace(/\<\/code\>/g, '`')
+        .replace(/\<em\>/g, '**')
+        .replace(/\<\/em\>/g, '**')
+        .replace(/\<i\>/g, '*')
+        .replace(/\<\/i\>/g, '*')
 }
 
 const parseSelect = (doms, cb) => {
     doms.each((index, li) => {
         const liContent = replaceCodeTab(li.innerHTML)
         const result = /(\w)(: )?/m.exec(liContent)
-        try {
-            const selectItem = result[1]
-            cb(selectItem, liContent)
-        } catch (error) {
-            console.log(error);
-        }
+        const selectItem = result[1]
+        cb(selectItem, liContent)
     });
 }
 
@@ -29,7 +28,7 @@ const parseAnswer = (ps) => {
     ps.each((index, p) => {
         if (index === len || index === 0) return
         const content = replaceCodeTab(p.innerHTML)
-        str += content+'\n'
+        str += content + '\n'
     });
 
     return str
@@ -37,30 +36,37 @@ const parseAnswer = (ps) => {
 
 const parseMd = (mds = []) => {
     const mdMap = new Map();
-    mds.forEach((md) => {
+    mds.forEach((md, index) => {
+        const id = index + 1
         const mdHtml = mdIt.render(md)
         const dom = new JSDOM(mdHtml);
         const { window } = dom
         const $ = require('jquery')(window);
         const answer = parseAnswer($('p'))
         const obj = {
+            id,
             title: $('h6').text(),
             result: $('h4').text(),
             code: $('.language-javascript').text(),
             answer
         }
-        parseSelect($('ul>li'), (key, value) => {
-            const option = { key, value }
-            if (obj.options) {
-                obj.options.push(option)
-                return
-            }
-            obj.options = [option]
-        })
-
-        console.log(obj);
+        // 如果选项解析失败，则抛弃该题目
+        try {
+            parseSelect($('ul>li'), (key, value) => {
+                const option = { key, value }
+                if (obj.options) {
+                    obj.options.push(option)
+                    return
+                }
+                obj.options = [option]
+            })
+            mdMap.set(id, obj)
+        } catch (error) {
+            console.warn('解析出错:', error);
+        }
     })
 
+    return Array.from(mdMap.values())
 }
 
 const readMd = (path) => {
@@ -71,7 +77,15 @@ const readMd = (path) => {
     return content;
 }
 
+const jsonWriteToMd = (jsonContent) => {
+    const path = require('path')
+    const outPath = path.join(__dirname, '../questions.json')
+    fs.writeFileSync(outPath, jsonContent, 'utf8')
+}
+
 (() => {
     const mds = readMd(path)
-    parseMd(mds)
+    const mdArray = parseMd(mds)
+    const json = JSON.stringify(mdArray)
+    jsonWriteToMd(json)
 })()
