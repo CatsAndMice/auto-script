@@ -34,22 +34,22 @@ const parseAnswer = (ps) => {
     return str
 }
 
-const parseMd = (mds = []) => {
+const parseMd = (md = '') => {
+    const mdHtml = mdIt.render(md)
+    const dom = new JSDOM(mdHtml)
+    const { window } = dom
+    return window
+}
+
+
+const getMdMapValue = (mds = []) => {
     const mdMap = new Map();
     mds.forEach((md, index) => {
         const id = index + 1
-        const mdHtml = mdIt.render(md)
-        const dom = new JSDOM(mdHtml);
-        const { window } = dom
+        const window = parseMd(md)
         const $ = require('jquery')(window);
         const answer = parseAnswer($('p'))
-        const obj = {
-            id,
-            title: $('h6').text(),
-            result: $('h4').text(),
-            code: $('.language-javascript').text(),
-            answer
-        }
+        const obj = { id, title: $('h6').text(), result: $('h4').text(), code: $('.language-javascript').text(), answer }
         // 如果选项解析失败，则抛弃该题目
         try {
             parseSelect($('ul>li'), (key, value) => {
@@ -62,12 +62,12 @@ const parseMd = (mds = []) => {
             })
             mdMap.set(id, obj)
         } catch (error) {
-            console.warn('解析出错:', error);
+            console.warn('解析出错:', error)
         }
     })
-
     return Array.from(mdMap.values())
 }
+
 
 const readMd = (path) => {
     let content = fs.readFileSync(path, { encoding: 'utf-8' });
@@ -85,7 +85,7 @@ const jsonWriteToMd = (jsonContent) => {
 
 (() => {
     const mds = readMd(path)
-    const mdArray = parseMd(mds)
+    const mdArray = getMdMapValue(mds)
     const json = JSON.stringify(mdArray)
     jsonWriteToMd(json)
 })()

@@ -14,8 +14,10 @@ const path = require('path');
         const type = path.extname(src)
         console.log(type);
         const fileName = Date.now() + type
-        const { data } = await axios.get(src)
+        const { data } = await axios.get(src, {
+            responseType: 'stream'
+        })
         const download = path.join(__dirname, fileName)
-        fs.writeFileSync(download, data)
+        data.pipe(fs.createWriteStream(download))
     })
 })()
